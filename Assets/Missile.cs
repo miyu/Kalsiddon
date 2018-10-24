@@ -17,6 +17,7 @@ public class Missile : CustomPhysics {
    public float VlerpCollapseMillis = 8000.0f;
    public bool DeadReckoningEnabled;
    public Vector3 DeadReckoningDirectionUnitWorld;
+   public float DeadReckoningDistanceThreshold = 2;
 
    public float StartupDelay = 0;
    public float ThrusterActivationDelay = 0;
@@ -56,7 +57,7 @@ public class Missile : CustomPhysics {
       // Acceleration: Seek tracer
       var vToTarget = Tracer.transform.position - transform.position;
 
-      if (vToTarget.magnitude < 2) StartDeadReckoningIfNotStarted();
+      if (vToTarget.magnitude < DeadReckoningDistanceThreshold) StartDeadReckoningIfNotStarted();
 
       var seekDirectionUnitWorld = DeadReckoningEnabled
          ? DeadReckoningDirectionUnitWorld

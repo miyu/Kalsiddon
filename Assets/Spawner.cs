@@ -17,12 +17,15 @@ public class Spawner : MonoBehaviour {
    }
 
    private IEnumerator MainLoop() {
-      var random = new System.Random();
-      while (true) {
+      var random = new System.Random(9);
+      for (var i = 0;; i++) {
          var tracer = Instantiate(tracerPrefab, transform);
          tracer.transform.position = transform.position;
          var dir = Vector3.Lerp(random.NextVector3CosineWeightedHemisphere().XZY(), Vector3.up, 0.6f);
-         tracer.Velocity = dir * 12;
+		 if (i % 4 >= 2) {
+		    dir.z = -Math.Abs(dir.z) - 0.8f;
+		 }
+         tracer.Velocity = dir.normalized * 12 + Vector3.up * 3;
          yield return new WaitForSeconds(0.3f);
 
 
@@ -31,18 +34,30 @@ public class Spawner : MonoBehaviour {
          missile.transform.localScale *= 4;
          missile.transform.LookAt(transform.position + Vector3.up, random.NextVector3UnitCircleXY().XZY());
          missile.Velocity = Vector3.up * 0.01f;
+		 InitMissile(random, missile);
          missile.Tracer = tracer;
 //         missile.StartupDelay = 0.5f;
-         StartCoroutine(MissileSplit(random, new[]{-2.0f, 0.8f}, missile, 5.0f));
+         switch (i / 4) {
+            case 1:
+               StartCoroutine(MissileSplit(random, new[]{-2.0f}, missile, 5.0f));
+               break;
+            case 2:
+               StartCoroutine(MissileSplit(random, new[]{-2.0f, 0.8f}, missile, 5.0f));
+               break;
+	     }
 
          missile.MissileTrailContext = new GameObject { name = "MTC" };
-         AddTrailHostToMissile(random, missile);
+         AddTrailHostToMissile(random, missile, 0);
 
          yield return new WaitForSeconds(8f);
       }
    }
+   
+   private void InitMissile(Random random, Missile missile) {
+     missile.DeadReckoningDistanceThreshold = 1.0f + (float)random.NextDouble() * 1.0f;
+   }
 
-   private void AddTrailHostToMissile(Random random, Missile missile) {
+   private void AddTrailHostToMissile(Random random, Missile missile, int depth) {
       var trailHost = new GameObject();
       trailHost.transform.parent = missile.transform;
       trailHost.transform.localPosition = Vector3.zero;
@@ -52,7 +67,7 @@ public class Spawner : MonoBehaviour {
       tr.material = new Material(trailMaterialBase) {
          color = random.NextHueColor()
       };
-      tr.startWidth = tr.endWidth = 0.1f;
+      tr.startWidth = tr.endWidth = 0.3f / ((float)Math.Pow(2.5, depth));
    }
 
    private IEnumerator MissileSplit(Random random, float[] timesToSplit, Missile missile, float leafTimeToDeath, int depth = 0) {
@@ -85,12 +100,13 @@ public class Spawner : MonoBehaviour {
          clone.NormalTerminalVelocity = missile.NormalTerminalVelocity * 1.5f;
          clone.DeadReckoningTerminalVelocity = missile.DeadReckoningTerminalVelocity * 1.5f;
          clone.MissileTrailContext = missile.MissileTrailContext;
-         AddTrailHostToMissile(random, clone);
+		 InitMissile(random, missile);
+         AddTrailHostToMissile(random, clone, depth + 1);
 
          if (depth + 1 < timesToSplit.Length) {
             StartCoroutine(MissileSplit(random, timesToSplit, clone, leafTimeToDeath, depth + 1));
          } else {
-            StartCoroutine(EnableDeadReckoningAfterSeconds(clone, 1.5f));
+            StartCoroutine(EnableDeadReckoningAfterSeconds(clone, 2.5f));
             StartCoroutine(DestroyMissileAfterSeconds(clone, leafTimeToDeath));
          }
       }
