@@ -2174,15 +2174,13 @@ MonoBehaviour:
   LinearVelocity: {x: 0, y: 0, z: 0}
   AngularVelocity: {x: 0, y: 0, z: 0}
   Tracer: {fileID: 0}
-  AlerpCollapseMillis: 4000
+  DeadReckoningMaterial: {fileID: 2100000, guid: bbb43eeba34b2014db1f7dc07b660837,
+    type: 2}
   VlerpCollapseMillis: 8000
   DeadReckoningEnabled: 0
   DeadReckoningDirectionUnitWorld: {x: 0, y: 0, z: 0}
-  DeadReckoningDistanceThreshold: 2
   ControlSystemBootDelay: 0
   ThrusterActivationDelay: 0
-  NormalTerminalVelocity: 10
-  DeadReckoningTerminalVelocity: 20
   CenterOfMass: {fileID: 1992564720509882}
   MissileTrailContext: {fileID: 0}
   TrailHost: {fileID: 0}

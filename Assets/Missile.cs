@@ -10,6 +10,7 @@ using Debug = UnityEngine.Debug;
 public class Missile : CustomPhysics {
    public Tracer Tracer;
 
+   [SerializeField] private Material DeadReckoningMaterial;
    private readonly Stopwatch timer = new Stopwatch();
    private ThrustBehaviour[] thrusters;
 
@@ -37,6 +38,7 @@ public class Missile : CustomPhysics {
 
    public void Awake() {
       thrusters = GetComponentsInChildren<ThrustBehaviour>();
+//      thrusters = new [] { thrusters[0], thrusters[1] };
    }
 
    public void Start() {
@@ -54,7 +56,6 @@ public class Missile : CustomPhysics {
       var vToTarget = Tracer.transform.position - transform.position;
       if (vToTarget.magnitude < DeadReckoningDistanceThreshold) {
          StartDeadReckoningIfNotStarted();
-         Destroy(gameObject);
       }
 
       var seekDirectionUnitWorld = DeadReckoningEnabled
@@ -80,7 +81,7 @@ public class Missile : CustomPhysics {
       var localToWorld = transform.localToWorldMatrix;
       var linearAccelerationWorld = localToWorld.MultiplyVector(vernierPropulsionContributions.LinearAccelerationLocal);
       var angularAccelerationWorld = localToWorld.MultiplyVector(vernierPropulsionContributions.AngularAccelerationLocal);
-      linearAccelerationWorld *= 30;
+      linearAccelerationWorld *= 15;
       angularAccelerationWorld *= 10;
 
       // Compute main propulsion contribution
@@ -90,7 +91,7 @@ public class Missile : CustomPhysics {
       AngularVelocity += angularAccelerationWorld * dt;
       AngularVelocity *= 0.99f;
 
-      var alerp = Mathf.Lerp(0.3f, 0.8f, timer.ElapsedMilliseconds / AlerpCollapseMillis);
+      var alerp = Mathf.Lerp(0.5f, 0.8f, timer.ElapsedMilliseconds / AlerpCollapseMillis);
       var actualAcceleration = Vector3.Lerp(linearAccelerationWorld.normalized, seekDirectionUnitWorld, alerp) * linearAccelerationWorld.magnitude;
       LinearVelocity += actualAcceleration * dt;
 
@@ -200,6 +201,11 @@ public class Missile : CustomPhysics {
       gameObject.name = "DR";
       DeadReckoningEnabled = true;
       DeadReckoningDirectionUnitWorld = vToTarget.normalized;
+
+      foreach (var renderer in GetComponentsInChildren<Renderer>()) {
+         if (renderer is TrailRenderer) continue;
+         renderer.sharedMaterial = DeadReckoningMaterial;
+      }
    }
 }
 
@@ -219,7 +225,7 @@ public class CustomPhysics : MonoBehaviour {
 //         LinearVelocity += g * Time.fixedDeltaTime;
          transform.position = 2.0f * new Vector3(Mathf.Cos(Time.time), 0, Mathf.Sin(Time.time)) +
                               0.5f * new Vector3(0, Mathf.Sin(Time.time * Mathf.Exp(1)), Mathf.Cos(Time.time * Mathf.Exp(1))) +
-                              new Vector3(5, 1, 0);
+                              new Vector3(5, 1.1f, 0);
          return;
       }
 
