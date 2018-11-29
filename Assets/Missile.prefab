@@ -2124,7 +2124,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Sensor: {fileID: 114371834857791068}
-  Strength: 2
+  Strength: 3
 --- !u!114 &114733391649916698
 MonoBehaviour:
   m_ObjectHideFlags: 1

@@ -17,11 +17,11 @@ public class Spawner : MonoBehaviour {
    }
 
    private IEnumerator MainLoop() {
-      var random = new System.Random(9);
+      var globalRandom = new System.Random(9);
       for (var i = 0;; i++) {
          var tracer = Instantiate(tracerPrefab, transform);
          tracer.transform.position = transform.position;
-         var dir = Vector3.Lerp(random.NextVector3CosineWeightedHemisphere().XZY(), Vector3.up, 0.6f);
+         var dir = Vector3.Lerp(globalRandom.NextVector3CosineWeightedHemisphere().XZY(), Vector3.up, 0.6f);
          if (i % 4 >= 2) {
             dir.z = -Math.Abs(dir.z) - 0.8f;
          }
@@ -29,20 +29,22 @@ public class Spawner : MonoBehaviour {
          tracer.LinearVelocity = dir.normalized * 8 + Vector3.up * 3;
          yield return new WaitForSeconds(0.3f);
 
+         var random = new Random(globalRandom.Next());
          var missile = Instantiate(missilePrefab, transform);
          missile.transform.position = transform.position;
          missile.transform.localScale *= 4;
          missile.LinearVelocity = Vector3.right * 2.0f;
-         missile.transform.LookAt(transform.position + missile.LinearVelocity, random.NextVector3UnitCircleXY().XZY());
-         InitMissile(random, missile);
+         missile.transform.LookAt(transform.position + missile.LinearVelocity, random.NextVector3UnitCircleXY().ZXY());
+         missile.random = random;
+         InitMissile(missile);
          missile.Tracer = tracer;
 //         missile.StartupDelay = 0.5f;
          switch (i / 4) {
             case 1:
-               StartCoroutine(MissileSplit(random, new[] { -2.0f }, missile, 5.0f));
+               StartCoroutine(MissileSplit(new[] { -2.0f }, missile, 5.0f));
                break;
             case 2:
-               StartCoroutine(MissileSplit(random, new[] { -2.0f, 0.8f }, missile, 5.0f));
+               StartCoroutine(MissileSplit(new[] { -2.0f, 0.8f }, missile, 5.0f));
                break;
          }
 
@@ -54,8 +56,8 @@ public class Spawner : MonoBehaviour {
       }
    }
 
-   private void InitMissile(Random random, Missile missile) {
-      missile.DeadReckoningDistanceThreshold = 1.0f + (float)random.NextDouble() * 1.0f;
+   private void InitMissile(Missile missile) {
+      missile.DeadReckoningDistanceThreshold = 1.0f + (float)missile.random.NextDouble() * 1.0f;
    }
 
    private void AddTrailHostToMissile(Random random, Missile missile, int depth) {
@@ -71,7 +73,8 @@ public class Spawner : MonoBehaviour {
       tr.startWidth = tr.endWidth = 0.03f / ((float)Math.Pow(2.5, depth));
    }
 
-   private IEnumerator MissileSplit(Random random, float[] timesToSplit, Missile missile, float leafTimeToDeath, int depth = 0) {
+   private IEnumerator MissileSplit(float[] timesToSplit, Missile missile, float leafTimeToDeath, int depth = 0) {
+      var originalRandom = missile.random;
       var timeToSplit = timesToSplit[depth];
       if (timeToSplit < 0) {
          yield return new WaitForSeconds(-timeToSplit);
@@ -83,6 +86,7 @@ public class Spawner : MonoBehaviour {
       }
 
       for (var i = 0; i < 4; i++) {
+         var random = new Random(originalRandom.Next());
          var x = missile.transform.right;
          var y = missile.transform.forward;
          var z = missile.transform.up;
@@ -93,19 +97,20 @@ public class Spawner : MonoBehaviour {
          clone.transform.position = missile.transform.position;
          clone.transform.localScale = missile.transform.localScale / 2;
          clone.LinearVelocity = missile.LinearVelocity.magnitude * velocityDirection;
-         clone.transform.LookAt(clone.transform.position + clone.LinearVelocity, Vector3.right);
+         clone.transform.LookAt(clone.transform.position + clone.LinearVelocity, Vector3.Cross(clone.LinearVelocity.normalized, random.NextVector3CosineWeightedHemisphere()));
          clone.Tracer = missile.Tracer;
+         clone.random = random;
 //         clone.AlerpCollapseMillis = missile.AlerpCollapseMillis * 0.8f;
 //         clone.VlerpCollapseMillis = missile.VlerpCollapseMillis * 0.5f;
          clone.ThrusterActivationDelay = (float)random.NextDouble() * 0.2f + 0.1f;
          clone.NormalTerminalVelocity = missile.NormalTerminalVelocity * 1.5f;
          clone.DeadReckoningTerminalVelocity = missile.DeadReckoningTerminalVelocity * 1.5f;
          clone.MissileTrailContext = missile.MissileTrailContext;
-         InitMissile(random, missile);
+         InitMissile(missile);
          AddTrailHostToMissile(random, clone, depth + 1);
 
          if (depth + 1 < timesToSplit.Length) {
-            StartCoroutine(MissileSplit(random, timesToSplit, clone, leafTimeToDeath, depth + 1));
+            StartCoroutine(MissileSplit(timesToSplit, clone, leafTimeToDeath, depth + 1));
          } else {
             StartCoroutine(EnableDeadReckoningAfterSeconds(clone, 2.5f));
             StartCoroutine(DestroyMissileAfterSeconds(clone, leafTimeToDeath));
@@ -159,4 +164,5 @@ public static class RandomStatics {
    }
 
    public static Vector3 XZY(this Vector3 v) => new Vector3(v.x, v.z, v.y);
+   public static Vector3 ZXY(this Vector3 v) => new Vector3(v.z, v.x, v.y);
 }

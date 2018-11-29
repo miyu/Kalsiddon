@@ -6,6 +6,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.Assertions;
 using Debug = UnityEngine.Debug;
+using Random = System.Random;
 
 public class Missile : CustomPhysics {
    public Tracer Tracer;
@@ -13,6 +14,8 @@ public class Missile : CustomPhysics {
    [SerializeField] private Material DeadReckoningMaterial;
    private readonly Stopwatch timer = new Stopwatch();
    private ThrustBehaviour[] thrusters;
+
+   public Random random;
 
    private float AlerpCollapseMillis = 1000.0f;
    public float VlerpCollapseMillis = 80000.0f;
@@ -24,11 +27,14 @@ public class Missile : CustomPhysics {
    public float ThrusterActivationDelay = 0;
 
    internal float NormalTerminalVelocity = 5;
-   internal float DeadReckoningTerminalVelocity = 8;
+   internal float DeadReckoningTerminalVelocity = 10;
 
    private float Mass = 1;
-   private Vector3 MomentOfInertia = Vector3.one * 0.001f;
-   
+//   private Vector3 MomentOfInertia = Vector3.one * 0.001f;
+   private Vector3 MomentOfInertia = new Vector3(
+      0.1f,
+      0.1f,
+      0.001f);
 
    public GameObject CenterOfMass;
    public GameObject MissileTrailContext;
@@ -38,7 +44,30 @@ public class Missile : CustomPhysics {
 
    public void Awake() {
       thrusters = GetComponentsInChildren<ThrustBehaviour>();
-//      thrusters = new [] { thrusters[0], thrusters[1] };
+      var r = new Random();
+      foreach (var thruster in thrusters) {
+         if (r.Next() % 2 == 0) {
+            var tempPosition = thruster.transform.localPosition;
+            var tempRotation = thruster.transform.localRotation;
+            thruster.transform.localPosition = thruster.Sensor.transform.localPosition;
+            thruster.transform.localRotation = thruster.Sensor.transform.localRotation;
+            thruster.Sensor.transform.localPosition = tempPosition;
+            thruster.Sensor.transform.localRotation = tempRotation;
+         }
+         if (r.Next() % 2 == 0) {
+            thruster.transform.localPosition = Vector3.Scale(thruster.transform.localPosition, new Vector3(-1, -1, 1));
+            thruster.Sensor.transform.localPosition = Vector3.Scale(thruster.transform.localPosition, new Vector3(-1, -1, 1));
+
+            var rot = Quaternion.AngleAxis(Mathf.PI, new Vector3(0, 0, 1));
+            thruster.transform.localRotation *= rot;
+            thruster.Sensor.transform.localRotation *= rot;
+         }
+         if (r.Next() % 2 == 0) {
+            var rot = Quaternion.AngleAxis((float)r.NextDouble() * Mathf.PI * 2, new Vector3(0, 0, 1));
+            thruster.transform.localRotation *= rot;
+            thruster.Sensor.transform.localRotation *= rot;
+         }
+      }
    }
 
    public void Start() {
@@ -91,7 +120,7 @@ public class Missile : CustomPhysics {
       AngularVelocity += angularAccelerationWorld * dt;
       AngularVelocity *= 0.99f;
 
-      var alerp = Mathf.Lerp(0.5f, 0.8f, timer.ElapsedMilliseconds / AlerpCollapseMillis);
+      var alerp = Mathf.Lerp(0.5f, 0.9f, timer.ElapsedMilliseconds / AlerpCollapseMillis);
       var actualAcceleration = Vector3.Lerp(linearAccelerationWorld.normalized, seekDirectionUnitWorld, alerp) * linearAccelerationWorld.magnitude;
       LinearVelocity += actualAcceleration * dt;
 
@@ -101,6 +130,13 @@ public class Missile : CustomPhysics {
       var velocityCap = DeadReckoningEnabled ? DeadReckoningTerminalVelocity : NormalTerminalVelocity;
       LinearVelocity = Math.Min(LinearVelocity.magnitude, velocityCap) * Vector3.Lerp(LinearVelocity.normalized, seekDirectionUnitWorld.normalized, vlerp * vlerp);
       Debug.Log(LinearVelocity.magnitude);
+
+      var rot = transform.localRotation;
+      rot.x += (float)(random.NextDouble() * 0.01);
+      rot.y += (float)(random.NextDouble() * 0.01);
+      rot.z += (float)(random.NextDouble() * 0.01);
+      rot.w += (float)(random.NextDouble() * 0.01);
+      transform.localRotation = rot.normalized;
    }
 
    /// <summary>
@@ -213,19 +249,22 @@ public class CustomPhysics : MonoBehaviour {
    protected static readonly Vector3 g = Vector3.down * 9.8f;
    public Vector3 LinearVelocity;
    public Vector3 AngularVelocity;
+   private float t;
 
    public virtual void FixedUpdate() {
 //      LinearVelocity = Vector3.zero;
 //      AngularVelocity = new Vector3(0, 0, Mathf.PI);
+      t += Time.fixedDeltaTime;
 
       transform.position += LinearVelocity * Time.fixedDeltaTime;
       if (GetComponent<Missile>()) {
 //         LinearVelocity += g * Time.fixedDeltaTime * 0.1f;
       } else {
 //         LinearVelocity += g * Time.fixedDeltaTime;
-         transform.position = 2.0f * new Vector3(Mathf.Cos(Time.time), 0, Mathf.Sin(Time.time)) +
-                              0.5f * new Vector3(0, Mathf.Sin(Time.time * Mathf.Exp(1)), Mathf.Cos(Time.time * Mathf.Exp(1))) +
-                              new Vector3(5, 1.1f, 0);
+//         transform.position = 2.0f * new Vector3(Mathf.Cos(Time.time), 0, Mathf.Sin(Time.time)) +
+//                              0.5f * new Vector3(0, Mathf.Sin(Time.time * Mathf.Exp(1)), Mathf.Cos(Time.time * Mathf.Exp(1))) +
+//                              new Vector3(5, 1.1f, 0);
+         transform.position = new Vector3(4 + t, 1.1f, 0.05f * Mathf.Sin(Time.time));
          return;
       }
 
