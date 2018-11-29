@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Diagnostics;
+using Assets;
 using UnityEngine;
 using Random = System.Random;
 
@@ -16,8 +17,8 @@ public class Spawner : MonoBehaviour {
       StartCoroutine(MainLoop());
    }
 
+   private Random globalRandom = new Random(9);
    private IEnumerator MainLoop() {
-      var globalRandom = new System.Random(9);
       for (var i = 0;; i++) {
          var tracer = Instantiate(tracerPrefab, transform);
          tracer.transform.position = transform.position;
@@ -33,13 +34,14 @@ public class Spawner : MonoBehaviour {
          var missile = Instantiate(missilePrefab, transform);
          missile.transform.position = transform.position;
          missile.transform.localScale *= 4;
-         missile.LinearVelocity = Vector3.right * 2.0f;
-         missile.transform.LookAt(transform.position + missile.LinearVelocity, random.NextVector3UnitCircleXY().ZXY());
-         missile.random = random;
+         missile.RigidBody.LinearVelocity = Vector3.right * 2.0f;
+         missile.DestinationTransformOptional = tracer.transform;
+         missile.transform.LookAt(transform.position + missile.RigidBody.LinearVelocity, random.NextVector3UnitCircleXY().ZXY());
+
          InitMissile(missile);
-         missile.Tracer = tracer;
-//         missile.StartupDelay = 0.5f;
+
          switch (i / 4) {
+            case 0:
             case 1:
                StartCoroutine(MissileSplit(new[] { -2.0f }, missile, 5.0f));
                break;
@@ -57,7 +59,7 @@ public class Spawner : MonoBehaviour {
    }
 
    private void InitMissile(Missile missile) {
-      missile.DeadReckoningDistanceThreshold = 1.0f + (float)missile.random.NextDouble() * 1.0f;
+      missile.Config.DeadReckoningActivationRange += missile.Config.DeadReckoningActivationRangeSpread * globalRandom.NextFloat();
    }
 
    private void AddTrailHostToMissile(Random random, Missile missile, int depth) {
@@ -74,7 +76,6 @@ public class Spawner : MonoBehaviour {
    }
 
    private IEnumerator MissileSplit(float[] timesToSplit, Missile missile, float leafTimeToDeath, int depth = 0) {
-      var originalRandom = missile.random;
       var timeToSplit = timesToSplit[depth];
       if (timeToSplit < 0) {
          yield return new WaitForSeconds(-timeToSplit);
@@ -86,7 +87,7 @@ public class Spawner : MonoBehaviour {
       }
 
       for (var i = 0; i < 4; i++) {
-         var random = new Random(originalRandom.Next());
+         var random = new Random(globalRandom.Next());
          var x = missile.transform.right;
          var y = missile.transform.forward;
          var z = missile.transform.up;
@@ -96,15 +97,15 @@ public class Spawner : MonoBehaviour {
          var clone = Instantiate(missilePrefab, transform);
          clone.transform.position = missile.transform.position;
          clone.transform.localScale = missile.transform.localScale / 2;
-         clone.LinearVelocity = missile.LinearVelocity.magnitude * velocityDirection;
-         clone.transform.LookAt(clone.transform.position + clone.LinearVelocity, Vector3.Cross(clone.LinearVelocity.normalized, random.NextVector3CosineWeightedHemisphere()));
-         clone.Tracer = missile.Tracer;
-         clone.random = random;
+         clone.RigidBody.LinearVelocity = missile.RigidBody.LinearVelocity.magnitude * velocityDirection;
+//         clone.transform.LookAt(clone.transform.position + clone.RigidBody.LinearVelocity, Vector3.Cross(clone.RigidBody.LinearVelocity.normalized, random.NextVector3CosineWeightedHemisphere()));
+         clone.transform.LookAt(clone.transform.position + clone.RigidBody.LinearVelocity, Vector3.Cross(clone.RigidBody.LinearVelocity.normalized, random.NextVector3CosineWeightedHemisphere()));
+         clone.DestinationTransformOptional = missile.DestinationTransformOptional;
 //         clone.AlerpCollapseMillis = missile.AlerpCollapseMillis * 0.8f;
 //         clone.VlerpCollapseMillis = missile.VlerpCollapseMillis * 0.5f;
-         clone.ThrusterActivationDelay = (float)random.NextDouble() * 0.2f + 0.1f;
-         clone.NormalTerminalVelocity = missile.NormalTerminalVelocity * 1.5f;
-         clone.DeadReckoningTerminalVelocity = missile.DeadReckoningTerminalVelocity * 1.5f;
+//         clone.ThrusterActivationDelay = (float)random.NextDouble() * 0.2f + 0.1f;
+         clone.Config.NormalTerminalVelocity = missile.Config.NormalTerminalVelocity * 1.5f;
+         clone.Config.DeadReckoningTerminalVelocity = missile.Config.DeadReckoningTerminalVelocity * 1.5f;
          clone.MissileTrailContext = missile.MissileTrailContext;
          InitMissile(missile);
          AddTrailHostToMissile(random, clone, depth + 1);
@@ -124,7 +125,7 @@ public class Spawner : MonoBehaviour {
 
    private IEnumerator EnableDeadReckoningAfterSeconds(Missile missile, float seconds) {
       yield return new WaitForSeconds(seconds);
-      missile.StartDeadReckoningIfNotStarted();
+      missile.LocomotionController.StartDeadReckoningIfNotStarted();
    }
 
    private IEnumerator DestroyMissileAfterSeconds(Missile missile, float seconds) {
@@ -141,28 +142,4 @@ public class Spawner : MonoBehaviour {
       yield return new WaitForSeconds(seconds);
       Destroy(obj);
    }
-}
-
-public static class RandomStatics {
-   public static Vector3 NextVector3CosineWeightedHemisphere(this Random random) {
-      var a = (float)Math.Abs(random.NextDouble());
-      var b = (float)Math.Abs(random.NextDouble());
-
-      var r = Mathf.Sqrt(1 - a * a);
-      var phi = 2 * Mathf.PI * b;
-
-      return new Vector3(Mathf.Cos(phi) * r, Mathf.Sin(phi) * r, a);
-   }
-
-   public static Vector3 NextVector3UnitCircleXY(this Random random) {
-      var theta = (float)random.NextDouble() * (Mathf.PI * 2);
-      return new Vector3(Mathf.Cos(theta), Mathf.Sin(theta), 0);
-   }
-
-   public static Color NextHueColor(this Random random) {
-      return Color.HSVToRGB((float)random.NextDouble(), 1, 1);
-   }
-
-   public static Vector3 XZY(this Vector3 v) => new Vector3(v.x, v.z, v.y);
-   public static Vector3 ZXY(this Vector3 v) => new Vector3(v.z, v.x, v.y);
 }
