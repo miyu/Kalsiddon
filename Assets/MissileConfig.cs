@@ -28,10 +28,12 @@ namespace Assets {
       public float AngularVelocityDampening = 0.99f;
 
       public float AccelerationLerpCollapseMillis = 1000.0f;
-      public float VelocityLerpCollapseMillis = 80000.0f;
+      public float AccelerationLerpBase = 0.5f;
+      public float VelocityLerpCollapseMillis = 20000.0f;
+      public float VelocityOptimality = 0.1f;
 
       public bool IsDeadReckoningFeatureEnabled = true;
-      public float DeadReckoningActivationRange = 1;
+      public float DeadReckoningActivationRange = 2;
       public float DeadReckoningActivationRangeSpread = 1.0f;
       public float DeadReckoningTerminalVelocity = 10;
    }

@@ -2116,9 +2116,11 @@ MonoBehaviour:
   NormalTerminalVelocity: 4
   AngularVelocityDampening: 0.99
   AccelerationLerpCollapseMillis: 1000
-  VelocityLerpCollapseMillis: 80000
+  AccelerationLerpBase: 0.5
+  VelocityLerpCollapseMillis: 20000
+  VelocityOptimality: 0.1
   IsDeadReckoningFeatureEnabled: 1
-  DeadReckoningActivationRange: 1
+  DeadReckoningActivationRange: 2
   DeadReckoningActivationRangeSpread: 1
   DeadReckoningTerminalVelocity: 10
 --- !u!114 &114149169954214238

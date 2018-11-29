@@ -16,7 +16,11 @@ public class MissileLocomotionController : MonoBehaviour {
    [SerializeField] private MissileConfig config;
    [SerializeField] private AggregateMissileGuidanceCalculator guidanceCalculator;
    [SerializeField] private CustomMissileRigidBody rigidBody;
+   private Vector3 lastPosition;
    private bool isDeadReckoningActivated;
+   private bool isPreviouslyAlignedToTarget;
+   private int deadReckoningAlignmentCount;
+   private Vector3 deadReckoningPosition;
    private Vector3 deadReckoningDirection;
 
    private readonly Stopwatch timer = new Stopwatch();
@@ -31,7 +35,10 @@ public class MissileLocomotionController : MonoBehaviour {
    }
 
    public void Step(float dt) {
-      var seekDirection = UpdateDeadReckoningAndComputeSeekDirection();
+      var actualForward = (transform.position - lastPosition).normalized;
+      lastPosition = transform.position;
+
+      var seekDirection = UpdateDeadReckoningAndComputeSeekDirection(actualForward);
       var netAccelerations = guidanceCalculator.ComputeNetAccelerationsWorld(seekDirection);
 
       // Integrate and dampen angular velocity
@@ -40,13 +47,13 @@ public class MissileLocomotionController : MonoBehaviour {
       rigidBody.AngularVelocity = Vector3.ClampMagnitude(rigidBody.AngularVelocity, 5);
 
       // Magically correct linear acceleration, then integrate linear velocity
-      var accelerationOptimality = Mathf.Lerp(0.5f, 0.9f, timer.ElapsedMilliseconds / config.AccelerationLerpCollapseMillis);
+      var accelerationOptimality = Mathf.Lerp(config.AccelerationLerpBase, 0.9f, timer.ElapsedMilliseconds / config.AccelerationLerpCollapseMillis);
       var linearAcceleration = netAccelerations.LinearAcceleration;
       linearAcceleration = linearAcceleration.LerpDirection(seekDirection, accelerationOptimality);
       rigidBody.LinearVelocity += linearAcceleration * dt;
 
       // Magically correct linear velocity to match acceleration
-      var velocityOptimality = 0.1f;// timer.ElapsedMilliseconds / config.VelocityLerpCollapseMillis;
+      var velocityOptimality = config.VelocityOptimality;
       rigidBody.LinearVelocity = rigidBody.LinearVelocity.LerpDirection(
          linearAcceleration.normalized,
          velocityOptimality);
@@ -70,28 +77,50 @@ public class MissileLocomotionController : MonoBehaviour {
          ));
    }
 
-   private Vector3 UpdateDeadReckoningAndComputeSeekDirection() {
-      if (isDeadReckoningActivated) {
-         return deadReckoningDirection;
-      }
-
+   private Vector3 UpdateDeadReckoningAndComputeSeekDirection(Vector3 actualForward) {
       var vToTarget = missile.ComputeDestination() - transform.position;
-      var isInDeadReckoningRange = vToTarget.magnitude < config.DeadReckoningActivationRange;
-      if (config.IsDeadReckoningFeatureEnabled && isInDeadReckoningRange) {
-         StartDeadReckoning(vToTarget.normalized);
+      var distanceToTarget = vToTarget.magnitude;
+      var vToTargetUnit = vToTarget / distanceToTarget;
+      var alignmentToTarget = Vector3.Dot(vToTargetUnit, actualForward);
+
+      if (!isDeadReckoningActivated) {
+         var isInDeadReckoningRange = distanceToTarget < config.DeadReckoningActivationRange;
+         if (config.IsDeadReckoningFeatureEnabled && isInDeadReckoningRange && alignmentToTarget > 0.8f) {
+            StartDeadReckoning();
+         } else {
+            return vToTarget.normalized;
+         }
       }
 
-      return isDeadReckoningActivated ? deadReckoningDirection : vToTarget.normalized;
+      if (!isPreviouslyAlignedToTarget && alignmentToTarget > 0.8f) {
+         deadReckoningAlignmentCount++;
+         isPreviouslyAlignedToTarget = true;
+      } else if (isPreviouslyAlignedToTarget && alignmentToTarget < 0.7f) {
+         isPreviouslyAlignedToTarget = false;
+      }
+
+      Debug.DrawLine(deadReckoningPosition, deadReckoningPosition + Vector3.right * 0.1f, Color.white, 0.5f);
+      Debug.DrawLine(deadReckoningPosition, deadReckoningPosition + Vector3.up * 0.1f, Color.white, 0.5f);
+      Debug.DrawLine(deadReckoningPosition, deadReckoningPosition + Vector3.forward * 0.1f, Color.white, 0.5f);
+      var vToDeadReckoningPosition = (deadReckoningPosition - transform.position).normalized;
+      var direction = Vector3.Lerp(vToDeadReckoningPosition, deadReckoningDirection, Mathf.Lerp(0.8f, 1, deadReckoningAlignmentCount / 3f));
+      return Vector3.Lerp(vToTargetUnit, direction, Mathf.Lerp(0.8f, 1, deadReckoningAlignmentCount / 2f));
    }
 
-   public void StartDeadReckoning(Vector3 direction) {
+   public void StartDeadReckoning() {
       Assert.IsFalse(isDeadReckoningActivated);
 
       isDeadReckoningActivated = true;
-      deadReckoningDirection = direction;
+      deadReckoningPosition = missile.ComputeDestination();
+      deadReckoningDirection = (deadReckoningPosition - transform.position).normalized;
 
-      // For debuggability, suffix dead-reckoning missiles' names
+      // For debuggability, suffix dead-reckoning missiles' names, color red
       gameObject.name += " (DR)";
+
+      foreach (var renderer in GetComponentsInChildren<Renderer>()) {
+         if (renderer is TrailRenderer) continue;
+         renderer.sharedMaterial = missile.DeadReckoningMaterial;
+      }
    }
 
    public void StartDeadReckoningIfNotStarted() {
@@ -99,6 +128,6 @@ public class MissileLocomotionController : MonoBehaviour {
       Assert.IsTrue(config.IsDeadReckoningFeatureEnabled);
 
       var vToTarget = missile.ComputeDestination() - transform.position;
-      StartDeadReckoning(vToTarget.normalized);
+      StartDeadReckoning();
    }
 }

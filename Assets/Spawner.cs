@@ -17,6 +17,12 @@ public class Spawner : MonoBehaviour {
       StartCoroutine(MainLoop());
    }
 
+   public void Update() {
+      if (Input.GetKey(KeyCode.Z)) Time.timeScale = 0.1f;
+      if (Input.GetKey(KeyCode.X)) Time.timeScale = 2;
+      if (Input.GetKey(KeyCode.C)) Time.timeScale = 1;
+   }
+
    private Random globalRandom = new Random(9);
    private IEnumerator MainLoop() {
       for (var i = 0;; i++) {
@@ -39,14 +45,14 @@ public class Spawner : MonoBehaviour {
          missile.transform.LookAt(transform.position + missile.RigidBody.LinearVelocity, random.NextVector3UnitCircleXY().ZXY());
 
          InitMissile(missile);
+         missile.DestinationTransformOptional.GetComponent<Tracer>().MissileCount++;
 
-         switch (i / 4) {
-            case 0:
+         switch (2) {//i / 4) {
             case 1:
-               StartCoroutine(MissileSplit(new[] { -2.0f }, missile, 5.0f));
+               StartCoroutine(MissileSplit(new[] { -1.0f }, missile, 5.0f));
                break;
             case 2:
-               StartCoroutine(MissileSplit(new[] { -2.0f, 0.8f }, missile, 5.0f));
+               StartCoroutine(MissileSplit(new[] { -1.0f, 0.8f }, missile, 5.0f));
                break;
          }
 
@@ -91,7 +97,7 @@ public class Spawner : MonoBehaviour {
          var x = missile.transform.right;
          var y = missile.transform.forward;
          var z = missile.transform.up;
-         var r = Vector3.Lerp(random.NextVector3CosineWeightedHemisphere().XZY(), Vector3.up, 0.5f);
+         var r = Vector3.Lerp(random.NextVector3CosineWeightedHemisphere().XZY(), Vector3.up, 0.7f);
          var velocityDirection = r.x * x + r.y * y + r.z * z;
 
          var clone = Instantiate(missilePrefab, transform);
@@ -101,19 +107,24 @@ public class Spawner : MonoBehaviour {
 //         clone.transform.LookAt(clone.transform.position + clone.RigidBody.LinearVelocity, Vector3.Cross(clone.RigidBody.LinearVelocity.normalized, random.NextVector3CosineWeightedHemisphere()));
          clone.transform.LookAt(clone.transform.position + clone.RigidBody.LinearVelocity, Vector3.Cross(clone.RigidBody.LinearVelocity.normalized, random.NextVector3CosineWeightedHemisphere()));
          clone.DestinationTransformOptional = missile.DestinationTransformOptional;
-//         clone.AlerpCollapseMillis = missile.AlerpCollapseMillis * 0.8f;
-//         clone.VlerpCollapseMillis = missile.VlerpCollapseMillis * 0.5f;
+         clone.Config.AccelerationLerpCollapseMillis = missile.Config.AccelerationLerpCollapseMillis * 0.7f;
+         clone.Config.AccelerationLerpBase = Mathf.Lerp(missile.Config.AccelerationLerpBase, 1, 0.5f);
+         clone.Config.VelocityLerpCollapseMillis = missile.Config.VelocityLerpCollapseMillis * 0.6f;
+         clone.Config.VelocityOptimality = missile.Config.VelocityOptimality * 0.6f;
 //         clone.ThrusterActivationDelay = (float)random.NextDouble() * 0.2f + 0.1f;
-         clone.Config.NormalTerminalVelocity = missile.Config.NormalTerminalVelocity * 1.5f;
+         clone.Config.NormalTerminalVelocity = missile.Config.NormalTerminalVelocity * 1.1f;
+         clone.Config.DeadReckoningActivationRange = missile.Config.DeadReckoningActivationRange / 4;
+         clone.Config.DeadReckoningActivationRangeSpread = missile.Config.DeadReckoningActivationRangeSpread / 2;
          clone.Config.DeadReckoningTerminalVelocity = missile.Config.DeadReckoningTerminalVelocity * 1.5f;
          clone.MissileTrailContext = missile.MissileTrailContext;
          InitMissile(missile);
+         missile.DestinationTransformOptional.GetComponent<Tracer>().MissileCount++;
          AddTrailHostToMissile(random, clone, depth + 1);
 
          if (depth + 1 < timesToSplit.Length) {
             StartCoroutine(MissileSplit(timesToSplit, clone, leafTimeToDeath, depth + 1));
          } else {
-            StartCoroutine(EnableDeadReckoningAfterSeconds(clone, 2.5f));
+            StartCoroutine(EnableDeadReckoningAfterSeconds(clone, 2f + random.NextFloat()));
             StartCoroutine(DestroyMissileAfterSeconds(clone, leafTimeToDeath));
          }
       }
@@ -134,7 +145,6 @@ public class Spawner : MonoBehaviour {
          missile.TrailHost.transform.parent = missile.MissileTrailContext.transform;
          StartCoroutine(DestroyAfterSeconds(missile.MissileTrailContext, 10));
       }
-
       Destroy(missile.gameObject);
    }
 

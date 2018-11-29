@@ -55,4 +55,14 @@ public class Missile : MonoBehaviour {
    public void OnCollisionEnter(Collision collision) {
       Debug.Log("!!");
    }
+
+   public void OnDestroy() {
+      var tracer = DestinationTransformOptional.GetComponent<Tracer>();
+      if (tracer) {
+         tracer.MissileCount--;
+         if (tracer.MissileCount == 0) {
+            Destroy(tracer.gameObject);
+         }
+      }
+   }
 }
