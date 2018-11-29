@@ -47,7 +47,7 @@ public class Spawner : MonoBehaviour {
          InitMissile(missile);
          missile.DestinationTransformOptional.GetComponent<Tracer>().MissileCount++;
 
-         switch (2) {//i / 4) {
+         switch (2) { //i / 4) {
             case 1:
                StartCoroutine(MissileSplit(new[] { -1.0f }, missile, 5.0f));
                break;
@@ -60,7 +60,7 @@ public class Spawner : MonoBehaviour {
          AddTrailHostToMissile(random, missile, 0);
 
 //         yield break;
-         yield return new WaitForSeconds(8f);
+         yield return new WaitForSeconds(6.5f + random.NextFloat());
       }
    }
 
@@ -124,7 +124,7 @@ public class Spawner : MonoBehaviour {
          if (depth + 1 < timesToSplit.Length) {
             StartCoroutine(MissileSplit(timesToSplit, clone, leafTimeToDeath, depth + 1));
          } else {
-            StartCoroutine(EnableDeadReckoningAfterSeconds(clone, 2f + random.NextFloat()));
+            StartCoroutine(EnableDeadReckoningAfterSeconds(clone, 2f + 2 * random.NextFloat()));
             StartCoroutine(DestroyMissileAfterSeconds(clone, leafTimeToDeath));
          }
       }
